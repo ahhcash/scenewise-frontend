@@ -85,7 +85,7 @@ export async function POST(req: Request) {
   try {
     // Parse the incoming request body
     const body = await req.json();
-
+    console.log(body);
     // Validate the request body
     if (!validateSearchRequest(body)) {
       return NextResponse.json(

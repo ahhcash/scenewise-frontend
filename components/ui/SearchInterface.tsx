@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Search,
   Upload,
@@ -38,6 +38,7 @@ interface SearchResponse {
 const SearchInterface = () => {
   // State management
   const [searchTerm, setSearchTerm] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<VideoSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -78,7 +79,16 @@ const SearchInterface = () => {
       reader.onerror = (error) => reject(error);
     });
   };
-
+  useEffect(() => {
+    return () => {
+      // Cleanup: pause all videos when component unmounts
+      Object.values(videoRefs.current).forEach((video) => {
+        if (video && !video.paused) {
+          video.pause();
+        }
+      });
+    };
+  }, []);
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -123,7 +133,7 @@ const SearchInterface = () => {
     setLoading(true);
     setError("");
     setResults([]); // Clear previous results when starting new search
-
+    setHasSearched(true);
     try {
       const queries = [];
 
@@ -140,7 +150,7 @@ const SearchInterface = () => {
         queries.push({
           type: "base64",
           value: base64,
-          embedding_model: "image",
+          embedding_model: "multimodal",
         });
       });
 
@@ -151,15 +161,6 @@ const SearchInterface = () => {
         },
         body: JSON.stringify({
           queries,
-          filters: {
-            AND: [
-              {
-                key: "modality",
-                operator: "eq",
-                value: "video",
-              },
-            ],
-          },
         }),
       });
 
@@ -198,44 +199,45 @@ const SearchInterface = () => {
   };
 
   // Handle video playback control
-  const handleVideoClick = (resultId: string, result: VideoSearchResult) => {
+  const handleVideoClick = async (
+    resultId: string,
+    result: VideoSearchResult,
+  ) => {
     const video = videoRefs.current[resultId];
     if (!video) return;
 
-    if (activeVideoId === resultId) {
-      if (video.paused) {
-        video.play();
-        setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
+    try {
+      if (activeVideoId === resultId) {
+        if (video.paused) {
+          await video.play();
+          setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
+        } else {
+          video.pause();
+          setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
+        }
       } else {
-        video.pause();
-        setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
-      }
-    } else {
-      // Pause previously playing video
-      if (activeVideoId && videoRefs.current[activeVideoId]) {
-        videoRefs.current[activeVideoId].pause();
-        setIsPlaying((prev) => ({ ...prev, [activeVideoId]: false }));
-      }
-      // Play the new video from the start time if specified
-      video.currentTime = result.startTime || 0;
-      video.play();
-      setActiveVideoId(resultId);
-      setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
-    }
-  };
-  // Handle video time updates
-  const handleTimeUpdate = (resultId: string, result: VideoSearchResult) => {
-    const video = videoRefs.current[resultId];
-    if (!video) return;
+        // Pause previously playing video
+        if (activeVideoId && videoRefs.current[activeVideoId]) {
+          videoRefs.current[activeVideoId].pause();
+          setIsPlaying((prev) => ({ ...prev, [activeVideoId]: false }));
+        }
 
-    // If video plays past the end time, seek back to start time and pause
-    if (result.endTime && video.currentTime > result.endTime) {
-      video.currentTime = result.startTime || 0;
-      video.pause();
-      setActiveVideoId(null);
+        // Play the new video
+        video.currentTime = result.startTime || 0;
+        await video.play();
+        setActiveVideoId(resultId);
+        setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
+      }
+    } catch (error) {
+      // Handle any playback errors
+      if (error.name !== "AbortError") {
+        console.error("Video playback error:", error);
+      }
+      // Update state to reflect actual video state
       setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
     }
   };
+  // Handle video time updates
 
   const handlePlay = (resultId: string) => {
     setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
@@ -372,7 +374,7 @@ const SearchInterface = () => {
           </div>
         </div>
       )}
-      {!loading && results.length === 0 && !error && searchTerm && (
+      {!loading && results.length === 0 && !error && hasSearched && (
         <div className="p-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-start">
             <div className="flex-shrink-0">
@@ -407,33 +409,30 @@ const SearchInterface = () => {
             className="bg-white p-6 border rounded-lg shadow-sm hover:shadow-md transition-shadow"
           >
             {/* Video preview */}
-            <div className="relative aspect-video mb-6 bg-black rounded-lg overflow-hidden">
+            <div className="relative aspect-video mb-6 bg-black rounded-lg overflow-hidden group">
               <video
                 ref={(el) => {
                   if (el) videoRefs.current[result.id] = el;
                 }}
                 src={result.url}
                 className="w-full h-full object-contain"
-                onTimeUpdate={() => handleTimeUpdate(result.id, result)}
                 onPlay={() => handlePlay(result.id)}
                 onPause={() => handlePause(result.id)}
               />
-              <button
-                onClick={() => handleVideoClick(result.id, result)}
-                className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 hover:bg-opacity-30 transition-opacity"
-              >
-                {isPlaying[result.id] ? (
-                  <Pause className="w-12 h-12 text-white" />
-                ) : (
-                  <Play className="w-12 h-12 text-white" />
-                )}
-              </button>
-              {/* Current timestamp indicator */}
-              {activeVideoId === result.id && videoRefs.current[result.id] && (
-                <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
-                  {videoRefs.current[result.id].currentTime.toFixed(1)}s
-                </div>
-              )}
+
+              {/* Simple play/pause button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <button
+                  onClick={() => handleVideoClick(result.id, result)}
+                  className="text-white hover:text-blue-400 transition-colors bg-black/50 p-2 rounded-full"
+                >
+                  {isPlaying[result.id] ? (
+                    <Pause className="w-8 h-8" />
+                  ) : (
+                    <Play className="w-8 h-8" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold text-gray-900">
