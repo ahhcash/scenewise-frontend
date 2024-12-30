@@ -386,7 +386,7 @@ const SearchInterface = () => {
           {/* Search input */}
           {/* Search button */}
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             disabled={loading}
             className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
           >
