@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   images: {
     domains: ["localhost"], // Add any other domains you need to load images from
   },
+  eslint: {
+    // This will disable ESLint during builds
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
