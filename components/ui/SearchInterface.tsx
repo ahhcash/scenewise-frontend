@@ -7,6 +7,8 @@ import {
   Play,
   Pause,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 
 // Types for our search results based on the API response
@@ -24,7 +26,6 @@ interface VideoSearchResult {
   transcript?: string;
   createdAt: string;
 }
-
 interface SearchResponse {
   results: VideoSearchResult[];
   pagination: {
@@ -33,6 +34,12 @@ interface SearchResponse {
     totalResults: number;
     hasMore: boolean;
   };
+}
+
+interface SearchQuery {
+  type: "text" | "base64";
+  value: string;
+  embedding_model: string;
 }
 
 const SearchInterface = () => {
@@ -52,6 +59,13 @@ const SearchInterface = () => {
   const [base64Contents, setBase64Contents] = useState<
     { file: File; base64: string }[]
   >([]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const pageSize = 10;
+
+  const [lastSearchQueries, setLastSearchQueries] = useState<SearchQuery[]>([]);
 
   const toggleSection = (
     resultId: string,
@@ -124,7 +138,7 @@ const SearchInterface = () => {
   };
 
   // Handle text-based search
-  const handleSearch = async () => {
+  const handleSearch = async (page = 1) => {
     if (!searchTerm.trim() && base64Contents.length === 0) {
       setError("Please enter a search term or upload files");
       return;
@@ -132,10 +146,10 @@ const SearchInterface = () => {
 
     setLoading(true);
     setError("");
-    setResults([]); // Clear previous results when starting new search
     setHasSearched(true);
+
     try {
-      const queries = [];
+      const queries: SearchQuery[] = [];
 
       if (searchTerm.trim()) {
         queries.push({
@@ -145,8 +159,7 @@ const SearchInterface = () => {
         });
       }
 
-      // Add all image queries
-      base64Contents.forEach(({ base64, file }) => {
+      base64Contents.forEach(({ base64 }) => {
         queries.push({
           type: "base64",
           value: base64,
@@ -154,45 +167,106 @@ const SearchInterface = () => {
         });
       });
 
+      // Save queries for pagination
+      setLastSearchQueries(queries);
+
+      const searchPayload = {
+        queries,
+        page,
+        page_size: pageSize,
+      };
+
       const response = await fetch("/api/search", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          queries,
-        }),
+        body: JSON.stringify(searchPayload),
       });
 
       if (!response.ok) {
-        let errorMessage = "Search failed";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          // If parsing error response fails, use default message
-        }
-        throw new Error(errorMessage);
+        throw new Error(await response.text());
       }
 
       const data: SearchResponse = await response.json();
 
-      if (!data.results || !Array.isArray(data.results)) {
-        throw new Error("Invalid response format from server");
-      }
+      // Reset video playback state when performing a new search
+      Object.values(videoRefs.current).forEach((video) => {
+        if (video && !video.paused) {
+          video.pause();
+        }
+      });
+      setActiveVideoId(null);
+      setIsPlaying({});
 
+      // Update state with search results and pagination info
       setResults(data.results);
+      setCurrentPage(data.pagination.currentPage);
+      setTotalPages(data.pagination.totalPages);
+      setTotalResults(data.pagination.totalResults);
 
+      // Clear any previous errors
+      setError("");
+
+      // Handle no results case
       if (data.results.length === 0) {
         setError("No results found. Try adjusting your search.");
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An unexpected error occurred while searching",
-      );
+      console.error("Search error:", err);
+      setError("An unexpected error occurred while searching");
       setResults([]);
+      setCurrentPage(1);
+      setTotalPages(0);
+      setTotalResults(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePageChange = async (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages || loading) return;
+
+    setLoading(true);
+
+    try {
+      const searchPayload = {
+        queries: lastSearchQueries,
+        page: newPage,
+        page_size: pageSize,
+      };
+
+      const response = await fetch("/api/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(searchPayload),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const data: SearchResponse = await response.json();
+
+      // Reset video playback state
+      Object.values(videoRefs.current).forEach((video) => {
+        if (video && !video.paused) {
+          video.pause();
+        }
+      });
+      setActiveVideoId(null);
+      setIsPlaying({});
+
+      // Update state with new results
+      setResults(data.results);
+      setCurrentPage(data.pagination.currentPage);
+      setTotalPages(data.pagination.totalPages);
+      setTotalResults(data.pagination.totalResults);
+    } catch (err) {
+      setError("An error occurred while fetching more results");
+      console.error("Pagination error:", err);
     } finally {
       setLoading(false);
     }
@@ -245,6 +319,39 @@ const SearchInterface = () => {
 
   const handlePause = (resultId: string) => {
     setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
+  };
+
+  const renderPaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-center gap-4 mt-8">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1 || loading}
+          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages}
+          </span>
+          <span className="text-sm text-gray-500">
+            ({totalResults} total results)
+          </span>
+        </div>
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || loading}
+          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -470,60 +577,64 @@ const SearchInterface = () => {
             </div>
             <div className="space-y-4 mt-4">
               {result.description && (
-                <div>
+                <div className="border rounded-lg">
                   <button
                     onClick={() => toggleSection(result.id, "description")}
-                    className="flex items-center justify-between w-full text-left"
+                    className="flex items-center w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-colors"
                   >
-                    <h4 className="font-medium text-gray-900">
-                      Scene Description:
-                    </h4>
                     <ChevronDown
-                      className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
+                      className={`w-5 h-5 text-gray-500 transition-transform duration-200 mr-2 ${
                         expandedSections[result.id]?.description
                           ? "transform rotate-180"
                           : ""
                       }`}
                     />
+                    <h4 className="font-medium text-gray-900">
+                      Scene Description
+                    </h4>
                   </button>
                   <div
-                    className={`mt-2 overflow-hidden transition-all duration-200 ${
+                    className={`overflow-hidden transition-all duration-200 ${
                       expandedSections[result.id]?.description
                         ? "max-h-[500px] opacity-100"
                         : "max-h-0 opacity-0"
                     }`}
                   >
-                    <p className="text-gray-700 text-sm whitespace-pre-wrap">
-                      {result.description}
-                    </p>
+                    <div className="px-4 pb-4">
+                      <p className="text-gray-700 text-sm whitespace-pre-wrap">
+                        {result.description}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
               {result.transcript && (
-                <div>
+                <div className="border rounded-lg">
                   <button
                     onClick={() => toggleSection(result.id, "transcript")}
-                    className="flex items-center justify-between w-full text-left"
+                    className="flex items-center w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-colors"
                   >
-                    <h4 className="font-medium text-gray-900">Transcript:</h4>
                     <ChevronDown
-                      className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
+                      className={`w-5 h-5 text-gray-500 transition-transform duration-200 mr-2 ${
                         expandedSections[result.id]?.transcript
                           ? "transform rotate-180"
                           : ""
                       }`}
                     />
+                    <h4 className="font-medium text-gray-900">Transcript</h4>
                   </button>
                   <div
-                    className={`mt-2 overflow-hidden transition-all duration-200 ${
+                    className={`overflow-hidden transition-all duration-200 ${
                       expandedSections[result.id]?.transcript
                         ? "max-h-[500px] opacity-100"
                         : "max-h-0 opacity-0"
                     }`}
                   >
-                    <p className="text-gray-700 text-sm bg-gray-50 p-3 rounded">
-                      {result.transcript}
-                    </p>
+                    <div className="px-4 pb-4">
+                      <p className="text-gray-700 text-sm bg-gray-50 p-3 rounded">
+                        {result.transcript}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -531,6 +642,7 @@ const SearchInterface = () => {
           </div>
         ))}
       </div>
+      {renderPaginationControls()}
     </div>
   );
 };
