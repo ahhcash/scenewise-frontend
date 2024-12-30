@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     }
 
     // Call the Go backend search endpoint
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8080";
+    const backendUrl = process.env.BACKEND_API_URL;
     const response = await fetch(`${backendUrl}/search`, {
       method: "POST",
       headers: {
