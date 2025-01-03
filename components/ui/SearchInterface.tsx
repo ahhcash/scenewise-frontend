@@ -7,6 +7,8 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  Clock,
+  Target,
 } from "lucide-react";
 
 // Types for our search results based on the API response
@@ -275,8 +277,8 @@ const SearchInterface = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6">
-      <div className="mb-8">
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+      <div className="search-container p-6">
         <div className="flex gap-4 mb-4">
           <div className="flex-1 relative">
             <input
@@ -284,7 +286,9 @@ const SearchInterface = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search video content..."
-              className="w-full p-3 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
+              className="w-full p-3 pr-12 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+                       focus:outline-none focus:ring-2 focus:ring-blue-500
+                       text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
               onKeyPress={(e) => e.key === "Enter" && handleSearch()}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -294,21 +298,26 @@ const SearchInterface = () => {
                 className="hidden"
                 id="file-upload"
                 accept=".jpg,.jpeg,.png"
+                multiple
               />
               <label
                 htmlFor="file-upload"
-                className={`cursor-pointer ${selectedFiles.length > 0 ? "text-blue-500" : "text-gray-500 hover:text-gray-700"}`}
+                className={`cursor-pointer ${
+                  selectedFiles.length > 0
+                    ? "text-blue-500 dark:text-blue-400"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                }`}
               >
                 <Upload className="w-5 h-5" />
               </label>
             </div>
           </div>
-          {/* Search input */}
-          {/* Search button */}
           <button
             onClick={() => handleSearch()}
             disabled={loading}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700
+                     text-white rounded-lg flex items-center gap-2 transition-colors
+                     disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Search className="w-5 h-5" />
             {searchTerm && base64Contents.length > 0
@@ -317,10 +326,14 @@ const SearchInterface = () => {
           </button>
         </div>
       </div>
+
       {base64Contents.length > 0 && (
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div
+          className="mb-4 p-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg
+                      border border-gray-200 dark:border-gray-700"
+        >
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-medium text-gray-700">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Uploaded Images ({base64Contents.length}):
             </div>
             <button
@@ -328,7 +341,7 @@ const SearchInterface = () => {
                 setSelectedFiles([]);
                 setBase64Contents([]);
               }}
-              className="text-sm text-red-500 hover:text-red-700"
+              className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
             >
               Remove All
             </button>
@@ -336,7 +349,7 @@ const SearchInterface = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {base64Contents.map(({ file, base64 }, index) => (
               <div key={index} className="relative group">
-                <div className="aspect-square relative rounded-lg overflow-hidden border border-gray-200">
+                <div className="aspect-square relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                   <img
                     src={`data:${file.type};base64,${base64}`}
                     alt={`Uploaded content ${index + 1}`}
@@ -361,7 +374,7 @@ const SearchInterface = () => {
                     />
                   </svg>
                 </button>
-                <div className="mt-1 text-xs text-gray-500 truncate">
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 truncate">
                   {file.name}
                 </div>
               </div>
@@ -370,20 +383,18 @@ const SearchInterface = () => {
         </div>
       )}
 
-      {/* Loading state */}
       {loading && (
         <div className="flex justify-center items-center py-8">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 dark:text-blue-400" />
         </div>
       )}
 
-      {/* Error message */}
       {error && (
-        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="p-4 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg
-                className="h-5 w-5 text-red-400"
+                className="h-5 w-5 text-red-400 dark:text-red-300"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -395,18 +406,23 @@ const SearchInterface = () => {
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-1 text-sm text-red-700">{error}</div>
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                Error
+              </h3>
+              <div className="mt-1 text-sm text-red-700 dark:text-red-300">
+                {error}
+              </div>
             </div>
           </div>
         </div>
       )}
+
       {!loading && results.length === 0 && !error && hasSearched && (
-        <div className="p-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="p-4 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg
-                className="h-5 w-5 text-yellow-400"
+                className="h-5 w-5 text-yellow-400 dark:text-yellow-300"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -418,38 +434,31 @@ const SearchInterface = () => {
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
                 No Results
               </h3>
-              <div className="mt-1 text-sm text-yellow-700">
+              <div className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
                 Try adjusting your search terms or uploading different images.
               </div>
             </div>
           </div>
         </div>
       )}
-      {/* Video Results */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <div className="results-grid">
         {results.map((result) => (
-          <div
-            key={result.id}
-            className="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
-          >
-            {/* Video preview */}
+          <div key={result.id} className="result-card">
             <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
               <video
                 ref={(el) => {
                   if (el) {
                     videoRefs.current[result.id] = el;
-                    // Set initial time to startTime when video loads
                     el.addEventListener("loadedmetadata", () => {
                       if (result.startTime !== undefined) {
                         el.currentTime = result.startTime;
                       }
                     });
-                    // Add play event listener to manage active video
                     el.addEventListener("play", () => {
-                      // Pause all other videos
                       Object.entries(videoRefs.current).forEach(
                         ([id, video]) => {
                           if (id !== result.id && !video.paused) {
@@ -464,37 +473,35 @@ const SearchInterface = () => {
                 className="w-full h-full object-contain"
                 controls
                 controlsList="nodownload"
-                onError={(e) => console.error("Video error:", error)}
+                onError={(e) => console.error("Video error:", e)}
                 preload="auto"
                 playsInline
               />
             </div>
 
             <div className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-base font-semibold text-gray-900 line-clamp-2">
-                  {result.title || "Untitled Video"}
-                </h3>
-              </div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">
+                {result.title || "Untitled Video"}
+              </h3>
 
-              <div className="space-y-2 text-sm text-gray-600">
-                {result.duration && (
-                  <div className="flex items-center">
-                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  {result.duration && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                      <Clock className="w-3 h-3 mr-1" />
                       {Math.floor(result.duration)}s
                     </span>
-                  </div>
-                )}
+                  )}
 
-                <div className="flex items-center">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
+                    <Target className="w-3 h-3 mr-1" />
                     {(result.score * 100).toFixed(1)}% match
                   </span>
                 </div>
 
                 {result.startTime !== undefined &&
                   result.endTime !== undefined && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       Segment: {result.startTime.toFixed(1)}s -{" "}
                       {result.endTime.toFixed(1)}s
                     </div>
@@ -502,33 +509,33 @@ const SearchInterface = () => {
               </div>
 
               <div className="space-y-2 mt-4">
-                {/* Description section */}
                 {result.description && (
-                  <div className="border rounded">
+                  <div className="border dark:border-gray-700 rounded">
                     <button
                       onClick={() => toggleSection(result.id, "description")}
-                      className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-50 rounded transition-colors text-sm"
+                      className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800
+                               rounded transition-colors text-sm"
                     >
                       <ChevronDown
-                        className={`w-4 h-4 text-gray-500 transition-transform duration-200 mr-2 ${
-                          expandedSections[result.id]?.description
-                            ? "transform rotate-180"
-                            : ""
-                        }`}
+                        className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 mr-2
+                                  ${expandedSections[result.id]?.description ? "transform rotate-180" : ""}`}
                       />
-                      <span className="font-medium text-gray-700">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
                         Description
                       </span>
                     </button>
                     <div
-                      className={`transition-all duration-200 ${
+                      className={`transform transition-all duration-300 ease-in-out origin-top ${
                         expandedSections[result.id]?.description
-                          ? "max-h-[200px] opacity-100" // Fixed height for scrollable content
-                          : "max-h-0 opacity-0"
+                          ? "scale-y-100 opacity-100 max-h-[200px]"
+                          : "scale-y-0 opacity-0 max-h-0"
                       }`}
                     >
-                      <div className="px-3 pb-3 overflow-y-auto max-h-[200px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                        <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                      <div
+                        className="px-3 pb-3 overflow-y-auto max-h-[200px] scrollbar-thin scrollbar-thumb-gray-300
+                                    dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800"
+                      >
+                        <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
                           {result.description}
                         </p>
                       </div>
@@ -536,33 +543,33 @@ const SearchInterface = () => {
                   </div>
                 )}
 
-                {/* Transcript section */}
                 {result.transcript && (
-                  <div className="border rounded">
+                  <div className="border dark:border-gray-700 rounded">
                     <button
                       onClick={() => toggleSection(result.id, "transcript")}
-                      className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-50 rounded transition-colors text-sm"
+                      className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800
+                               rounded transition-colors text-sm"
                     >
                       <ChevronDown
-                        className={`w-4 h-4 text-gray-500 transition-transform duration-200 mr-2 ${
-                          expandedSections[result.id]?.transcript
-                            ? "transform rotate-180"
-                            : ""
-                        }`}
+                        className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 mr-2
+                                  ${expandedSections[result.id]?.transcript ? "transform rotate-180" : ""}`}
                       />
-                      <span className="font-medium text-gray-700">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
                         Transcript
                       </span>
                     </button>
                     <div
                       className={`transition-all duration-200 ${
                         expandedSections[result.id]?.transcript
-                          ? "max-h-[200px] opacity-100" // Fixed height for scrollable content
+                          ? "max-h-[200px] opacity-100"
                           : "max-h-0 opacity-0"
                       }`}
                     >
-                      <div className="px-3 pb-3 overflow-y-auto max-h-[200px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                        <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                      <div
+                        className="px-3 pb-3 overflow-y-auto max-h-[200px] scrollbar-thin scrollbar-thumb-gray-300
+                                    dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800"
+                      >
+                        <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
                           {result.transcript}
                         </p>
                       </div>
@@ -574,7 +581,35 @@ const SearchInterface = () => {
           </div>
         ))}
       </div>
-      {renderPaginationControls()}
+
+      <div className="flex items-center justify-center gap-4 mt-8">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1 || loading}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800
+                   disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            ({totalResults} total results)
+          </span>
+        </div>
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || loading}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800
+                   disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        </button>
+      </div>
     </div>
   );
 };
