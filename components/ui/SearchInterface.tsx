@@ -49,8 +49,6 @@ const SearchInterface = () => {
   const [results, setResults] = useState<VideoSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState<{ [key: string]: boolean }>({});
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement }>({});
   const [expandedSections, setExpandedSections] = useState<{
     [key: string]: { description: boolean; transcript: boolean };
@@ -74,7 +72,7 @@ const SearchInterface = () => {
       ...prev,
       [resultId]: {
         ...(prev[resultId] || { description: false, transcript: false }),
-        [section]: !(prev[resultId]?.[section] ?? false),
+        [section]: !prev[resultId]?.[section],
       },
     }));
   };
@@ -245,11 +243,6 @@ const SearchInterface = () => {
       // Then update results
       setResults(data.results);
 
-      // Reset video states when changing pages
-      setActiveVideoId(null);
-      setIsPlaying({});
-
-      // Scroll to top of results
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError("An error occurred while fetching more results");
@@ -257,55 +250,6 @@ const SearchInterface = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Handle video playback control
-  const handleVideoClick = async (
-    resultId: string,
-    result: VideoSearchResult,
-  ) => {
-    const video = videoRefs.current[resultId];
-    if (!video) return;
-
-    try {
-      if (activeVideoId === resultId) {
-        if (video.paused) {
-          await video.play();
-          setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
-        } else {
-          video.pause();
-          setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
-        }
-      } else {
-        // Pause previously playing video
-        if (activeVideoId && videoRefs.current[activeVideoId]) {
-          videoRefs.current[activeVideoId].pause();
-          setIsPlaying((prev) => ({ ...prev, [activeVideoId]: false }));
-        }
-
-        // Play the new video
-        video.currentTime = result.startTime || 0;
-        await video.play();
-        setActiveVideoId(resultId);
-        setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
-      }
-    } catch (error) {
-      // Handle any playback errors
-      if (error instanceof Error && error.name !== "AbortError") {
-        console.error("Video playback error:", error);
-      }
-      // Update state to reflect actual video state
-      setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
-    }
-  };
-  // Handle video time updates
-
-  const handlePlay = (resultId: string) => {
-    setIsPlaying((prev) => ({ ...prev, [resultId]: true }));
-  };
-
-  const handlePause = (resultId: string) => {
-    setIsPlaying((prev) => ({ ...prev, [resultId]: false }));
   };
 
   const renderPaginationControls = () => {
@@ -503,30 +447,38 @@ const SearchInterface = () => {
             className="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
           >
             {/* Video preview */}
-            <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden group">
+            <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
               <video
                 ref={(el) => {
-                  if (el) videoRefs.current[result.id] = el;
+                  if (el) {
+                    videoRefs.current[result.id] = el;
+                    // Set initial time to startTime when video loads
+                    el.addEventListener("loadedmetadata", () => {
+                      if (result.startTime !== undefined) {
+                        el.currentTime = result.startTime;
+                      }
+                    });
+                    // Add play event listener to manage active video
+                    el.addEventListener("play", () => {
+                      // Pause all other videos
+                      Object.entries(videoRefs.current).forEach(
+                        ([id, video]) => {
+                          if (id !== result.id && !video.paused) {
+                            video.pause();
+                          }
+                        },
+                      );
+                    });
+                  }
                 }}
                 src={result.url}
                 className="w-full h-full object-contain"
-                onPlay={() => handlePlay(result.id)}
-                onPause={() => handlePause(result.id)}
+                controls
+                controlsList="nodownload"
+                onError={(e) => console.error("Video error:", error)}
+                preload="auto"
+                playsInline
               />
-
-              {/* Play/pause button overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <button
-                  onClick={() => handleVideoClick(result.id, result)}
-                  className="text-white hover:text-blue-400 transition-colors bg-black/50 p-2 rounded-full"
-                >
-                  {isPlaying[result.id] ? (
-                    <Pause className="w-8 h-8" />
-                  ) : (
-                    <Play className="w-8 h-8" />
-                  )}
-                </button>
-              </div>
             </div>
 
             <div className="p-4">
@@ -580,16 +532,14 @@ const SearchInterface = () => {
                       </span>
                     </button>
                     <div
-                      className={`overflow-hidden transition-all duration-200 ${
+                      className={`transition-all duration-200 ${
                         expandedSections[result.id]?.description
-                          ? "max-h-[500px] opacity-100" // Increased max height
+                          ? "max-h-[200px] opacity-100" // Fixed height for scrollable content
                           : "max-h-0 opacity-0"
                       }`}
                     >
-                      <div className="px-3 pb-3">
+                      <div className="px-3 pb-3 overflow-y-auto max-h-[200px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                         <p className="text-xs text-gray-600 whitespace-pre-wrap">
-                          {" "}
-                          {/* Added whitespace-pre-wrap */}
                           {result.description}
                         </p>
                       </div>
@@ -616,16 +566,14 @@ const SearchInterface = () => {
                       </span>
                     </button>
                     <div
-                      className={`overflow-hidden transition-all duration-200 ${
+                      className={`transition-all duration-200 ${
                         expandedSections[result.id]?.transcript
-                          ? "max-h-[500px] opacity-100" // Increased max height
+                          ? "max-h-[200px] opacity-100" // Fixed height for scrollable content
                           : "max-h-0 opacity-0"
                       }`}
                     >
-                      <div className="px-3 pb-3">
+                      <div className="px-3 pb-3 overflow-y-auto max-h-[200px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                         <p className="text-xs text-gray-600 whitespace-pre-wrap">
-                          {" "}
-                          {/* Added whitespace-pre-wrap */}
                           {result.transcript}
                         </p>
                       </div>
