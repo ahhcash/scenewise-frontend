@@ -4,8 +4,6 @@ import {
   Search,
   Upload,
   Loader2,
-  Play,
-  Pause,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -25,15 +23,6 @@ interface VideoSearchResult {
   description?: string;
   transcript?: string;
   createdAt: string;
-}
-interface SearchResponse {
-  results: VideoSearchResult[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalResults: number;
-    hasMore: boolean;
-  };
 }
 
 interface SearchQuery {
