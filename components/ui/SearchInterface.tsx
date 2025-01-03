@@ -91,6 +91,9 @@ const SearchInterface = () => {
       });
     };
   }, []);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -242,6 +245,40 @@ const SearchInterface = () => {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle keyboard shortcuts if we're not clicking on a button
+      if (e.target instanceof HTMLButtonElement) return;
+
+      // Existing "/" shortcut logic
+      if (
+        e.key === "/" &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+
+      // Add pagination shortcuts
+      if (
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          handlePageChange(currentPage - 1);
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          handlePageChange(currentPage + 1);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [currentPage, handlePageChange]);
 
   const renderPaginationControls = () => {
     if (totalPages <= 1) return null;
@@ -251,26 +288,46 @@ const SearchInterface = () => {
         <button
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1 || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center px-4 py-2 rounded-lg bg-white dark:bg-gray-800
+                   border border-gray-200 dark:border-gray-700 shadow-sm
+                   hover:bg-gray-50 dark:hover:bg-gray-700
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   transition-colors duration-200"
         >
-          <ChevronLeft className="w-5 h-5 text-gray-600" />
+          <ChevronLeft className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-400" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Previous
+          </span>
+          <span className="hidden sm:inline ml-1 text-xs text-gray-500 dark:text-gray-400">
+            (←)
+          </span>
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Page {currentPage} of {totalPages}
           </span>
-          <span className="text-sm text-gray-500">
-            ({totalResults} total results)
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            ({totalResults} total)
           </span>
         </div>
 
         <button
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center px-4 py-2 rounded-lg bg-white dark:bg-gray-800
+                   border border-gray-200 dark:border-gray-700 shadow-sm
+                   hover:bg-gray-50 dark:hover:bg-gray-700
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   transition-colors duration-200"
         >
-          <ChevronRight className="w-5 h-5 text-gray-600" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Next
+          </span>
+          <ChevronRight className="w-5 h-5 ml-2 text-gray-600 dark:text-gray-400" />
+          <span className="hidden sm:inline ml-1 text-xs text-gray-500 dark:text-gray-400">
+            (→)
+          </span>
         </button>
       </div>
     );
@@ -281,47 +338,58 @@ const SearchInterface = () => {
       <div className="search-container p-6">
         <div className="flex gap-4 mb-4">
           <div className="flex-1 relative">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search video content..."
-              className="w-full p-3 pr-12 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
-                       focus:outline-none focus:ring-2 focus:ring-blue-500
-                       text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="relative flex items-center">
+              <Search className="absolute left-4 w-5 h-5 text-gray-400" />
               <input
-                type="file"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="file-upload"
-                accept=".jpg,.jpeg,.png"
-                multiple
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search video content..."
+                className="w-full pl-12 pr-24 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+                         focus:outline-none focus:ring-2 focus:ring-blue-500
+                         text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
               />
-              <label
-                htmlFor="file-upload"
-                className={`cursor-pointer ${
-                  selectedFiles.length > 0
-                    ? "text-blue-500 dark:text-blue-400"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                }`}
-              >
-                <Upload className="w-5 h-5" />
-              </label>
+              <div className="absolute right-3 flex items-center gap-2">
+                {/* Keyboard shortcut indicator */}
+                <div className="hidden sm:flex items-center border-r pr-3 border-gray-200 dark:border-gray-600">
+                  <kbd className="px-1.5 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded">
+                    /
+                  </kbd>
+                </div>
+                {/* File upload button */}
+                <input
+                  type="file"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="file-upload"
+                  accept=".jpg,.jpeg,.png"
+                  multiple
+                />
+                <label
+                  htmlFor="file-upload"
+                  className={`cursor-pointer ${
+                    selectedFiles.length > 0
+                      ? "text-blue-500 dark:text-blue-400"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  }`}
+                >
+                  <Upload className="w-5 h-5" />
+                </label>
+              </div>
             </div>
           </div>
           <button
             onClick={() => handleSearch()}
             disabled={loading}
             className="px-6 py-3 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700
-                     text-white rounded-lg flex items-center gap-2 transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+                     text-white rounded-xl flex items-center gap-2 transition-colors
+                     disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <Search className="w-5 h-5" />
             {searchTerm && base64Contents.length > 0
-              ? `Search All (${base64Contents.length + (searchTerm ? 1 : 0)} queries)`
+              ? `Search All (${base64Contents.length + (searchTerm ? 1 : 0)})`
               : "Search"}
           </button>
         </div>
@@ -582,34 +650,7 @@ const SearchInterface = () => {
         ))}
       </div>
 
-      <div className="flex items-center justify-center gap-4 mt-8">
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1 || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800
-                   disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-        </button>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Page {currentPage} of {totalPages}
-          </span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            ({totalResults} total results)
-          </span>
-        </div>
-
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800
-                   disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-        </button>
-      </div>
+      {renderPaginationControls()}
     </div>
   );
 };
