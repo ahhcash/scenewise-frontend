@@ -36,6 +36,12 @@ interface SearchQuery {
   embedding_model: string;
 }
 
+interface SearchRequestBody {
+  queries: SearchQuery[];
+  page: number;
+  offset_position: number;
+}
+
 // Helper function to validate base64 string
 function isValidBase64(str: string) {
   try {
@@ -44,6 +50,7 @@ function isValidBase64(str: string) {
       /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/;
     return regex.test(str);
   } catch (e) {
+    console.log(e);
     return false;
   }
 }
@@ -83,10 +90,8 @@ function validateSearchRequest(body: any): boolean {
 
 export async function POST(req: Request) {
   try {
-    // Parse the incoming request body
-    const body = await req.json();
-    console.log(body);
-    // Validate the request body
+    const body: SearchRequestBody = await req.json();
+
     if (!validateSearchRequest(body)) {
       return NextResponse.json(
         { error: "Invalid request format" },
@@ -94,14 +99,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Call the Go backend search endpoint
     const backendUrl = process.env.BACKEND_API_URL;
     const response = await fetch(`${backendUrl}/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body), // Send the entire payload to the backend
     });
 
     if (!response.ok) {
@@ -113,6 +117,7 @@ export async function POST(req: Request) {
     }
 
     const searchResults: SearchResponse = await response.json();
+    console.log(searchResults);
     return NextResponse.json(searchResults);
   } catch (error) {
     console.error("Search API route error:", error);

@@ -66,7 +66,6 @@ const SearchInterface = () => {
   const pageSize = 10;
 
   const [lastSearchQueries, setLastSearchQueries] = useState<SearchQuery[]>([]);
-
   const toggleSection = (
     resultId: string,
     section: "description" | "transcript",
@@ -148,6 +147,11 @@ const SearchInterface = () => {
     setError("");
     setHasSearched(true);
 
+    // Reset pagination state for new searches
+    setCurrentPage(1);
+    setTotalPages(0);
+    setTotalResults(0);
+
     try {
       const queries: SearchQuery[] = [];
 
@@ -172,8 +176,8 @@ const SearchInterface = () => {
 
       const searchPayload = {
         queries,
-        page,
-        page_size: pageSize,
+        page: 1, // Always start with page 1 for new searches
+        offset_position: 0, // Reset offset for new searches
       };
 
       const response = await fetch("/api/search", {
@@ -185,33 +189,16 @@ const SearchInterface = () => {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error("Search failed");
       }
 
-      const data: SearchResponse = await response.json();
-
-      // Reset video playback state when performing a new search
-      Object.values(videoRefs.current).forEach((video) => {
-        if (video && !video.paused) {
-          video.pause();
-        }
-      });
-      setActiveVideoId(null);
-      setIsPlaying({});
+      const data = await response.json();
 
       // Update state with search results and pagination info
       setResults(data.results);
       setCurrentPage(data.pagination.currentPage);
       setTotalPages(data.pagination.totalPages);
       setTotalResults(data.pagination.totalResults);
-
-      // Clear any previous errors
-      setError("");
-
-      // Handle no results case
-      if (data.results.length === 0) {
-        setError("No results found. Try adjusting your search.");
-      }
     } catch (err) {
       console.error("Search error:", err);
       setError("An unexpected error occurred while searching");
@@ -233,7 +220,7 @@ const SearchInterface = () => {
       const searchPayload = {
         queries: lastSearchQueries,
         page: newPage,
-        page_size: pageSize,
+        offset_position: (newPage - 1) * pageSize,
       };
 
       const response = await fetch("/api/search", {
@@ -245,25 +232,25 @@ const SearchInterface = () => {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error("Pagination failed");
       }
 
-      const data: SearchResponse = await response.json();
+      const data = await response.json();
 
-      // Reset video playback state
-      Object.values(videoRefs.current).forEach((video) => {
-        if (video && !video.paused) {
-          video.pause();
-        }
-      });
+      // Update page-related state first
+      setCurrentPage(newPage); // Explicitly set to the requested page
+      setTotalPages(data.pagination.totalPages);
+      setTotalResults(data.pagination.totalResults);
+
+      // Then update results
+      setResults(data.results);
+
+      // Reset video states when changing pages
       setActiveVideoId(null);
       setIsPlaying({});
 
-      // Update state with new results
-      setResults(data.results);
-      setCurrentPage(data.pagination.currentPage);
-      setTotalPages(data.pagination.totalPages);
-      setTotalResults(data.pagination.totalResults);
+      // Scroll to top of results
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError("An error occurred while fetching more results");
       console.error("Pagination error:", err);
@@ -335,7 +322,7 @@ const SearchInterface = () => {
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">
+          <span className="text-sm font-medium text-gray-700">
             Page {currentPage} of {totalPages}
           </span>
           <span className="text-sm text-gray-500">
@@ -355,7 +342,7 @@ const SearchInterface = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
+    <div className="w-full max-w-7xl mx-auto p-6">
       <div className="mb-8">
         <div className="flex gap-4 mb-4">
           <div className="flex-1 relative">
@@ -509,14 +496,14 @@ const SearchInterface = () => {
         </div>
       )}
       {/* Video Results */}
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {results.map((result) => (
           <div
             key={result.id}
-            className="bg-white p-6 border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
           >
             {/* Video preview */}
-            <div className="relative aspect-video mb-6 bg-black rounded-lg overflow-hidden group">
+            <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden group">
               <video
                 ref={(el) => {
                   if (el) videoRefs.current[result.id] = el;
@@ -527,7 +514,7 @@ const SearchInterface = () => {
                 onPause={() => handlePause(result.id)}
               />
 
-              {/* Simple play/pause button overlay */}
+              {/* Play/pause button overlay */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <button
                   onClick={() => handleVideoClick(result.id, result)}
@@ -541,103 +528,111 @@ const SearchInterface = () => {
                 </button>
               </div>
             </div>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {result.title || "Untitled Video"}
-              </h3>
-              {result.duration && (
-                <span className="text-sm text-gray-500">
-                  Duration: {Math.floor(result.duration)}s
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
-              <div className="flex items-center">
-                <span className="font-medium mr-2">Relevance:</span>
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                  {(result.score * 100).toFixed(1)}%
-                </span>
+
+            <div className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-base font-semibold text-gray-900 line-clamp-2">
+                  {result.title || "Untitled Video"}
+                </h3>
               </div>
-              {result.matchType && (
-                <div className="flex items-center">
-                  <span className="font-medium mr-2">Match Type:</span>
-                  <span className="capitalize">{result.matchType}</span>
-                </div>
-              )}
-              {result.startTime !== undefined &&
-                result.endTime !== undefined && (
+
+              <div className="space-y-2 text-sm text-gray-600">
+                {result.duration && (
                   <div className="flex items-center">
-                    <span className="font-medium mr-2">Segment:</span>
-                    <span>
-                      {result.startTime.toFixed(1)}s -{" "}
-                      {result.endTime.toFixed(1)}s
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      {Math.floor(result.duration)}s
                     </span>
                   </div>
                 )}
-            </div>
-            <div className="space-y-4 mt-4">
-              {result.description && (
-                <div className="border rounded-lg">
-                  <button
-                    onClick={() => toggleSection(result.id, "description")}
-                    className="flex items-center w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    <ChevronDown
-                      className={`w-5 h-5 text-gray-500 transition-transform duration-200 mr-2 ${
+
+                <div className="flex items-center">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                    {(result.score * 100).toFixed(1)}% match
+                  </span>
+                </div>
+
+                {result.startTime !== undefined &&
+                  result.endTime !== undefined && (
+                    <div className="text-xs text-gray-500">
+                      Segment: {result.startTime.toFixed(1)}s -{" "}
+                      {result.endTime.toFixed(1)}s
+                    </div>
+                  )}
+              </div>
+
+              <div className="space-y-2 mt-4">
+                {/* Description section */}
+                {result.description && (
+                  <div className="border rounded">
+                    <button
+                      onClick={() => toggleSection(result.id, "description")}
+                      className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-50 rounded transition-colors text-sm"
+                    >
+                      <ChevronDown
+                        className={`w-4 h-4 text-gray-500 transition-transform duration-200 mr-2 ${
+                          expandedSections[result.id]?.description
+                            ? "transform rotate-180"
+                            : ""
+                        }`}
+                      />
+                      <span className="font-medium text-gray-700">
+                        Description
+                      </span>
+                    </button>
+                    <div
+                      className={`overflow-hidden transition-all duration-200 ${
                         expandedSections[result.id]?.description
-                          ? "transform rotate-180"
-                          : ""
+                          ? "max-h-[500px] opacity-100" // Increased max height
+                          : "max-h-0 opacity-0"
                       }`}
-                    />
-                    <h4 className="font-medium text-gray-900">
-                      Scene Description
-                    </h4>
-                  </button>
-                  <div
-                    className={`overflow-hidden transition-all duration-200 ${
-                      expandedSections[result.id]?.description
-                        ? "max-h-[500px] opacity-100"
-                        : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    <div className="px-4 pb-4">
-                      <p className="text-gray-700 text-sm whitespace-pre-wrap">
-                        {result.description}
-                      </p>
+                    >
+                      <div className="px-3 pb-3">
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                          {" "}
+                          {/* Added whitespace-pre-wrap */}
+                          {result.description}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              {result.transcript && (
-                <div className="border rounded-lg">
-                  <button
-                    onClick={() => toggleSection(result.id, "transcript")}
-                    className="flex items-center w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    <ChevronDown
-                      className={`w-5 h-5 text-gray-500 transition-transform duration-200 mr-2 ${
+                )}
+
+                {/* Transcript section */}
+                {result.transcript && (
+                  <div className="border rounded">
+                    <button
+                      onClick={() => toggleSection(result.id, "transcript")}
+                      className="flex items-center w-full text-left px-3 py-2 hover:bg-gray-50 rounded transition-colors text-sm"
+                    >
+                      <ChevronDown
+                        className={`w-4 h-4 text-gray-500 transition-transform duration-200 mr-2 ${
+                          expandedSections[result.id]?.transcript
+                            ? "transform rotate-180"
+                            : ""
+                        }`}
+                      />
+                      <span className="font-medium text-gray-700">
+                        Transcript
+                      </span>
+                    </button>
+                    <div
+                      className={`overflow-hidden transition-all duration-200 ${
                         expandedSections[result.id]?.transcript
-                          ? "transform rotate-180"
-                          : ""
+                          ? "max-h-[500px] opacity-100" // Increased max height
+                          : "max-h-0 opacity-0"
                       }`}
-                    />
-                    <h4 className="font-medium text-gray-900">Transcript</h4>
-                  </button>
-                  <div
-                    className={`overflow-hidden transition-all duration-200 ${
-                      expandedSections[result.id]?.transcript
-                        ? "max-h-[500px] opacity-100"
-                        : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    <div className="px-4 pb-4">
-                      <p className="text-gray-700 text-sm bg-gray-50 p-3 rounded">
-                        {result.transcript}
-                      </p>
+                    >
+                      <div className="px-3 pb-3">
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                          {" "}
+                          {/* Added whitespace-pre-wrap */}
+                          {result.transcript}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         ))}
