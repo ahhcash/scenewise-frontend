@@ -336,24 +336,24 @@ const SearchInterface = () => {
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       <div className="search-container p-6">
-        <div className="flex gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <div className="relative flex items-center">
-              <Search className="absolute left-4 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 w-5 h-5 text-gray-400" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search video content..."
-                className="w-full pl-12 pr-24 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+                className="w-full pl-10 pr-4 sm:pr-24 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
                          focus:outline-none focus:ring-2 focus:ring-blue-500
                          text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
               />
-              <div className="absolute right-3 flex items-center gap-2">
+              <div className="absolute right-3 hidden sm:flex items-center gap-2">
                 {/* Keyboard shortcut indicator */}
-                <div className="hidden sm:flex items-center border-r pr-3 border-gray-200 dark:border-gray-600">
+                <div className="border-r pr-3 border-gray-200 dark:border-gray-600">
                   <kbd className="px-1.5 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded">
                     /
                   </kbd>
@@ -380,17 +380,42 @@ const SearchInterface = () => {
               </div>
             </div>
           </div>
+
+          {/* Mobile file upload button */}
+          <div className="sm:hidden flex justify-end">
+            <input
+              type="file"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="file-upload-mobile"
+              accept=".jpg,.jpeg,.png"
+              multiple
+            />
+            <label
+              htmlFor="file-upload-mobile"
+              className={`p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer ${
+                selectedFiles.length > 0
+                  ? "text-blue-500 dark:text-blue-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <Upload className="w-5 h-5" />
+            </label>
+          </div>
+
           <button
             onClick={() => handleSearch()}
             disabled={loading}
             className="px-6 py-3 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700
-                     text-white rounded-xl flex items-center gap-2 transition-colors
+                     text-white rounded-xl flex items-center justify-center gap-2 transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <Search className="w-5 h-5" />
-            {searchTerm && base64Contents.length > 0
-              ? `Search All (${base64Contents.length + (searchTerm ? 1 : 0)})`
-              : "Search"}
+            <span className="whitespace-nowrap">
+              {searchTerm && base64Contents.length > 0
+                ? `Search All (${base64Contents.length + (searchTerm ? 1 : 0)})`
+                : "Search"}
+            </span>
           </button>
         </div>
       </div>
