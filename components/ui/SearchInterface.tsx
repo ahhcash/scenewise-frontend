@@ -91,6 +91,43 @@ const SearchInterface = () => {
       });
     };
   }, []);
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          try {
+            const base64Content = await fileToBase64(file);
+            // Create a more user-friendly filename for pasted images
+            const pastedFile = new File(
+              [file],
+              `Pasted Image ${new Date().toISOString()}.png`,
+              {
+                type: file.type,
+              },
+            );
+
+            setSelectedFiles((prev) => [...prev, pastedFile]);
+            setBase64Contents((prev) => [
+              ...prev,
+              { file: pastedFile, base64: base64Content },
+            ]);
+          } catch (err) {
+            setError("Failed to process pasted image");
+            console.error("Paste processing error:", err);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -345,7 +382,7 @@ const SearchInterface = () => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search video content..."
+                placeholder="Search video content"
                 className="w-full pl-10 pr-4 sm:pr-24 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
                          focus:outline-none focus:ring-2 focus:ring-blue-500
                          text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
