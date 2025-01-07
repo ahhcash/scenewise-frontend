@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Grotle - Multimodal Search",
+  title: "Scenewise - Multimodal Search",
   description: "Search across text, images, and videos using natural language",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
