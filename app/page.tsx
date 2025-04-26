@@ -14,7 +14,7 @@ export default function Home() {
         <div className="container mx-auto py-16 px-4 relative">
           <div className="text-center">
             <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-              Multimodal Search
+              Scenewise - Multimodal Search
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               Search across text, images, and videos using natural language or
